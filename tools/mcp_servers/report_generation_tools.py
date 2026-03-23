@@ -1683,7 +1683,7 @@ def generate_and_store_html_report_from_raw_report(
     except Exception as e:
         return {"status": "error", "message": f"raw_report is not valid JSON: {str(e)}"}
 
-    hyps = _as_list(data.get("impact_hypotheses_output", {}).get("hypotheses"))
+    hyps = _as_list((data.get("impact_hypotheses_output") or {}).get("hypotheses"))
     if not hyps:
         return {"status": "success", "file_path": ""}
 

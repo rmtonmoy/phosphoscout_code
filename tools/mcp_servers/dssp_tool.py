@@ -224,7 +224,7 @@ def _test_dssp_tool() -> None:
         sys.stdout.flush()
 
         try:
-            save_path = "/tmp/test_structures"
+            save_path = str(PROJECT_ROOT / "test_structures")
             os.makedirs(save_path, exist_ok=True)
 
             dssp = _get_dssp_for_uniprot(test_case['uniprot_id'], save_path)
@@ -289,7 +289,7 @@ def _test_dssp_tool() -> None:
         sys.stdout.flush()
 
         try:
-            save_path = "/tmp/test_structures"
+            save_path = str(PROJECT_ROOT / "test_structures")
             result = get_solvent_accesibility(
                 uniprot_id=test_case['uniprot_id'],
                 central_residue=test_case['central_residue'],
@@ -326,7 +326,7 @@ def _test_dssp_tool() -> None:
         sys.stdout.flush()
 
         try:
-            save_path = "/tmp/test_structures"
+            save_path = str(PROJECT_ROOT / "test_structures")
             result = get_solvent_accessible_residues_from_uniprot(
                 uniprot_id=test_case['uniprot_id'],
                 save_path=save_path,
