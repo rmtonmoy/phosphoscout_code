@@ -1,0 +1,46 @@
+Evaluate a mechanistic hypothesis against CELLxGENE Census single-cell gene-expression data and return a structured, hypothesis-oriented differential-expression summary.
+
+This function tests whether available single-cell expression patterns align with, contradict, or fail to inform a user-provided mechanistic hypothesis (e.g., kinase–substrate–>pathway–>disease). It parses the hypothesis to identify candidate genes and relevant contexts (tissue, cell types, disease), enumerates viable comparison slices in Census, and runs a disciplined differential-expression comparison with a fixed Census version (2025-11-08). The workflow is goal-driven: it prefers cell-type-specific comparisons (single or multiple related cell types when justified), and only falls back to tissue+disease aggregate comparisons when cell-type-specific attempts prove unusable. Before any differential-expression computation, it strictly validates a non-zero-cell guarantee for both groups (numerator and denominator) in the exact slice(s) planned; if either group has zero cells, it does not proceed for that slice and explores alternatives.
+
+High-level procedure:
+- Understand the hypothesis and echo inputs; extract genes if not provided and discover usable observation columns.
+- Propose plausible tissue, disease, and cell-type contexts guided by the hypothesis and available filter options.
+- Validate coverage with dedicated dimension-discovery operations to ensure both diseased and normal groups have non-zero cells in the intended slice(s); do not assume normal controls exist for any tissue+cell_type.
+- Choose a cell-type strategy: single cell type (when highly specific and sufficiently powered), multiple related cell types combined with an "in" filter (when individually sparse or mechanism spans a category), or a last-resort tissue+disease-only fallback (no cell_type constraint) after cell-type-specific options fail. When using the fallback, explicitly note this and treat confidence conservatively.
+- Run differential expression with the planned filters and thresholds. If the result explicitly reports no data found, treat the comparison as unusable and explain why; attempt alternate gene identifiers when appropriate.
+- Interpret findings relative to mechanistic expectations and produce a one-line, scannable interpretation that ends with a verdict: SUPPORTS, CONTRADICTS, or UNINFORMATIVE. Apply conservative reporting thresholds (e.g., |logFC| ≥ 0.10 or effect_size ≥ 0.10 with q ≤ 0.10) unless the user specifies otherwise.
+- Early termination: If no suitable context can be validated (e.g., no normal controls, zero cells in groups, or no matching disease), return status = "no_suitable_context" with a concise explanation in notes; do not populate other fields with placeholders.
+
+Args:
+    query: str. Free-form input text containing all user-provided information required by this function. This should encode the logical inputs described above, including at minimum hypothesis_text and optionally organism (default "Homo sapiens"), pre-specified group1_filter and group2_filter strings, candidate genes, only_primary_data (default true), lfc_threshold (default 0.0), min_effect_size (default 0.0), and top_n (default 50). The function interprets group1 as the numerator (often diseased) and group2 as the denominator (often normal) for fold-change calculations.
+
+Returns:
+    dict: Dictionary matching the gene_expression_expert_output schema with keys:
+        - "status": str. Overall outcome; one of "success", "error", or "no_suitable_context". "no_suitable_context" indicates that no valid comparison slice could be established after disciplined exploration (e.g., no normal controls or zero cells in required groups); "success" indicates a valid comparison and interpretable results were produced.
+        - "group_filters": dict. Filter definitions and comparison semantics used for differential expression (present on success):
+            - "organism": str. Organism used (typically "Homo sapiens").
+            - "group1_filter": str. Filter expression for the NUMERATOR group (e.g., a disease slice; fold-change is computed as group1/group2).
+            - "group2_filter": str. Filter expression for the DENOMINATOR/reference group (often normal controls).
+            - "comparison_direction": str. Human-readable description of the comparison, e.g., "disease vs normal" meaning log2(disease/normal), so positive values indicate higher expression in disease.
+        - "genes_analyzed": list[str]. Final set of genes analyzed (extracted from the hypothesis and/or user input, possibly refined by availability in Census and filters).
+        - "results": list[dict]. Differential-expression statistics per gene (present on success). Each item contains:
+            - "gene": str. Gene symbol or identifier used in the analysis.
+            - "log_fold_change": float. log2(group1/group2); positive indicates higher expression in the numerator group, negative indicates higher expression in the denominator group.
+            - "effect_size": float. A standardized effect-size metric aligned with the comparison.
+            - "t_stat": float. Test statistic for the differential-expression model.
+            - "p_value": float. Nominal p-value for the gene-level test.
+            - "q_value": float. Multiple-testing-adjusted p-value.
+        - "interpretation": str. Single-line, structured synthesis using " | " to separate sections (e.g., "Context | Mechanistic expectations | Observed results | Alignment assessment | Conclusion"), with inline bullets (•) and a clear final verdict: SUPPORTS, CONTRADICTS, or UNINFORMATIVE. Quantitative findings (logFC, effect sizes, q-values) are highlighted concisely.
+        - "notes": str. Single-line, concise remarks (2–4 inline bullets) summarizing caveats, context choices (e.g., multiple cell types or fallback used), data limitations, or reasons when no analysis was possible. If a diffexp attempt returned no data, this field briefly explains why (e.g., gene ID mismatch) and any remediation attempted.
+
+Raises:
+    ValueError: If required inputs (e.g., hypothesis_text) are missing, malformed, or cannot be reconciled into valid filters.
+    RuntimeError: If differential-expression or prerequisite discovery steps fail in a way that prevents producing a valid result despite viable context.
+
+Notes:
+- Fixed dataset version: All Census queries target version 2025-11-08 to ensure reproducibility.
+- Non-zero-cell guarantee: Before any comparison, both groups must have non-zero cells for the exact slice(s); if either group is zero, the function does not run differential expression for that slice and instead explores alternatives or returns "no_suitable_context".
+- Multiple cell types: When appropriate, filters may combine related cell types using an "in" list to improve power; this should be disclosed in notes and typically carries slightly reduced confidence versus a single, highly specific cell type.
+- Tissue+disease-only fallback: Allowed only after reasonable cell-type-specific attempts fail; filters must omit any cell_type constraint, and notes must state that fallback was used (potential signal dilution). Confidence is generally reduced.
+- Handling no data: If a differential-expression response explicitly reports no data found, the function treats the attempt as unusable, sets status to "no_suitable_context" (unless another valid context succeeds), and records the reason in notes; it may attempt alternative gene identifiers.
+- Interpretation formatting: Both interpretation and notes are single-line strings with sections separated by " | "; use inline bullets (•), concise statements, and end the interpretation with a clear verdict. Apply conservative reporting thresholds (e.g., |logFC| ≥ 0.10 or effect_size ≥ 0.10 with q ≤ 0.10) unless overridden by the user.

@@ -1,0 +1,53 @@
+Collect, curate, and structure phosphorylation-relevant data for a specified protein-coding mutation.
+
+This function compiles a concise, citation-backed dossier about a single amino-acid substitution and its potential impact on phosphorylation post-translational modifications (PTMs). It adapts to one of three input modes encoded in the query (Ensembl transcript + gene + 1-letter mutation; gene + mutation in 1- or 3-letter code; or rsID) and follows a strict, staged workflow: (1) determine input case and normalize mutation notation; (1b) summarize gene background with inline citations and unique reference IDs; (2) resolve wildtype/mutant 29-mer protein segments centered on the mutation and extract evidence-supported phosphosite 15-mer windows; (2b) assess solvent accessibility around each phosphosite (RSA ≥ 0.1 within central ±3 positions) and early-exit if none are accessible; (3) summarize variant context with mandatory inline citations; (4) survey literature across general web sources and academic databases, assigning bibtex-style ref_ids; and (5) evaluate kinase specificity changes per phosphosite window, classify change types (within-class, gain, loss, class-swap), aggregate kinase-level scores, and set a global significance flag. The function enforces multiple early-exit conditions and returns a structured dictionary without long-form narrative text—only compact summaries with citations and structured fields.
+
+Args:
+    query: str. Free-form input text containing all user-provided information required by this function. This should encode one of the supported input patterns: (A) Ensembl transcript ID, gene symbol, and 1-letter mutation (e.g., ENST..., ACVR1, R206H); (B) gene symbol and mutation in 1- or 3-letter code (1-letter is converted to 3-letter, e.g., R206H → ARG206HIS); or (C) an rsID (e.g., rs121912678), which is first resolved to gene and protein-change notation before proceeding. The query should also include any contextual hints useful for targeted searches.
+
+Returns:
+    dict: Dictionary matching the mutation_data_collector_output schema with keys:
+        - "status": str. Overall outcome of the run; one of "success" or "error". Set to "error" when critical precursor steps fail (e.g., unable to obtain protein segments, UniProt ID resolution fails, or solvent accessibility retrieval errors). Otherwise "success" (including early-exit success modes).
+        - "gene_background": str. Brief 2–4 sentence overview of gene roles/functions and notable phenotypes/disease associations. Factual statements must include inline [ref_id] citations, where ref_id corresponds to entries in literature_sources.
+        - "variant_summary": str. Concise 2–5 sentence summary of the variant’s context, impact, and phosphorylation relevance. Every factual claim (e.g., clinical significance, disease associations, pathways) must be followed by one or more [ref_id] citations.
+        - "phosphosite_windows": list[dict]. Evidence-supported phosphosite 15-mer windows discovered within the 29-mer segments. For each window:
+            - "wildtype_15mer": str. The 15-mer sequence in the wildtype context.
+            - "mutant_15mer": str. The 15-mer sequence in the mutant context.
+            - "center": str. The central residue (S, T, or Y) of the 15-mer.
+            - "start_pos": int. 1-based start position of the 15-mer within the full protein sequence.
+            - "end_pos": int. 1-based end position of the 15-mer within the full protein sequence.
+            - "center_pos": int. 1-based position of the central phospho-acceptor within the full protein sequence.
+            - "residue_positions": list[int]. 1-based positions of each residue in the 15-mer (same for wildtype and mutant).
+            - "change_type": str. One of "within-class", "gain", "loss", or "class-swap", determined from wildtype vs mutant central residues.
+            - "evidence_info": str. Evidence annotation supporting the phosphosite (non-empty and not marked as "No evidence").
+            - "solvent_accessible": bool. True if any residue within central ±3 positions has RSA ≥ 0.1; otherwise False.
+            - "kinase_specificity_changes": list[dict]. Kinase-level comparison results for this window (empty for class-swap). Each entry contains:
+                - "kinase": str. Kinase name/identifier.
+                - "wildtype_confidence": float. Confidence or score for the wildtype context.
+                - "mutant_confidence": float. Confidence or score for the mutant context.
+                - "delta_metric": float. Score delta or effect size.
+                - "meets_threshold": bool. Whether this kinase meets significance thresholds for this window.
+            - "window_notes": str. Concise notes per window (e.g., no kinases met thresholds; class swap not quantified).
+          In the solvent-accessibility early-exit mode, all evidence-supported windows are included with solvent_accessible=false and empty kinase_specificity_changes.
+        - "literature_sources": list[dict]. All sources gathered during the survey, each with:
+            - "ref_id": str. Unique bibtex-style identifier (e.g., Smith2020, Chen2019Nature, PMID12345678) used for inline citations.
+            - "title": str. Source title.
+            - "url": str. URL or persistent identifier.
+            - "source_type": str. One of "web", "pubmed", "scholar", "arxiv", or "other".
+            - "summary": str. Brief 1–3 sentence takeaway of the source.
+            - "mutation_specific": bool. True if the source discusses the exact mutation.
+            - "establishes_disease_link": bool. True if the source links the mutation to a disease.
+            - "implicated_pathways": list[str]. Pathway names mentioned, if any.
+        - "any_significant_specificity_change": bool. True if at least one kinase meets thresholds for at least one phosphosite window; False reflects the Step 5 early-stop condition when no substantial specificity changes are detected.
+        - "notes": str. Global technical notes and reasons for any early exits (e.g., no evidence-supported windows; solvent accessibility filter terminated analysis; or no kinases met thresholds), or brief explanations for error status.
+
+Raises:
+    ValueError: If the query is malformed, missing essential identifiers, or encodes an unresolvable mutation notation.
+    RuntimeError: If critical resolution steps irrecoverably fail (e.g., unable to obtain protein segments, UniProt ID resolution failure, or solvent accessibility retrieval errors) such that a valid structured result cannot be produced. In normal operation, such failures are reported via the returned "status" and "notes" fields rather than exceptions.
+
+Notes:
+    - Input adaptation: The function auto-detects one of three input modes—(A) Ensembl transcript + gene + 1-letter mutation, (B) gene + 1-/3-letter mutation (1-letter converted to 3-letter), or (C) rsID (first resolved to gene and protein change). 29-mer segments must place the mutation at position 15 (1-based).
+    - Evidence filter (Step 2): Only phosphosite 15-mer windows with supporting evidence are retained. If none remain after filtering, the function returns success with phosphosite_windows=[], a succinct variant_summary stating no evidence-supported phosphosites were detected within the analyzed region, and halts further analysis.
+    - Solvent accessibility (Step 2b): A window passes if any residue within central ±3 positions has RSA ≥ 0.1. If no windows pass, the function returns success with solvent_accessible=false for all windows and clearly states that Steps 3–5 were skipped.
+    - Kinase changes (Step 5): change_type is assigned as within-class, gain, loss, or class-swap. Class-swap windows are not scored (kinase_specificity_changes remains empty). The global flag any_significant_specificity_change is set True only if at least one window has a kinase with meets_threshold=True; otherwise, the function early-stops at Step 5 with success and notes that no substantial kinase specificity changes were detected.
+    - Citations: Both gene_background and variant_summary require inline [ref_id] citations for factual claims. Each ref_id must match an entry in literature_sources with a unique bibtex-style identifier.

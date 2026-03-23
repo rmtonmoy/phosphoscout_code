@@ -1,0 +1,3 @@
+[submodule "tools/kinase-library"]
+	path = tools/kinase-library
+	url = https://github.com/TheKinaseLibrary/kinase-library.git

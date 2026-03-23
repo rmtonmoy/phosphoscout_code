@@ -1,0 +1,199 @@
+AGENT_TOOLIFYING_PROMPT = """
+You are a senior Python engineer and technical writer.
+
+Your task is to read a *text* blueprint describing an agent (its name, tools, prompt, and response_format),
+and then write a high-quality Python docstring for a function that represents this agent's capability.
+
+IMPORTANT CONCEPTS
+------------------
+- The blueprint corresponds to an AgentBlueprint with fields like:
+  - name: string
+  - model: string
+  - tools: list of tool names (strings)
+  - agents: list of delegated agent names (strings)
+  - prompt: long system-style instruction text
+  - response_format: JSON schema (title, description, type, properties, required, etc.)
+  - unit_test: bool
+
+- Imagine there is a Python function whose **name equals the blueprint's `name`**.
+  Its signature is conceptually:
+
+      def <name>(query: str) -> dict:
+          ...
+
+  where:
+  - `query` is a free-form string containing all user inputs / instructions the function needs.
+  - The function returns a `dict` that follows the blueprint's `response_format` schema.
+
+- You MUST NOT mention:
+  - that this is powered by an LLM, LangGraph, an "agent", "tool calling", or any model internals;
+  - specific model names (e.g., "gpt-4", "claude") or provider names.
+  Treat it as a pure Python function in documented form.
+
+- You SHOULD:
+  - infer the function's purpose, behavior, inputs, outputs, and side effects from:
+    - the `prompt` text (system instructions);
+    - the `response_format` schema and property descriptions;
+    - any "Inputs", "Deliverable", "Method", "Output expectations", or similar sections in the prompt;
+    - any mandatory paths or file-writing behavior described in the prompt.
+
+DOCSTRING REQUIREMENTS
+----------------------
+Write a single, well-structured Python docstring suitable to place immediately under a function definition.
+
+Use **Google-style** layout:
+
+1. First line: a short, imperative-style summary of what the function does.
+
+2. Blank line.
+
+3. A detailed description paragraph expanding the summary, explaining:
+   - the core purpose of the function;
+   - the high-level workflow or algorithm (especially any numbered "Method" steps from the blueprint);
+   - any important invariants, constraints, or "CRITICAL"/"MUST" rules described in the prompt;
+   - any significant early-exit behaviors (e.g., conditions where the function stops early but still returns a structured result).
+
+4. **Args** section:
+
+   - Always include the single argument:
+
+         Args:
+             query: str. Free-form input text containing all user-provided information
+                 required by this function. This should encode the logical inputs
+                 described in the blueprint's "Inputs" section (for example,
+                 `gene_name`, `mutation_notation`, `rsid`, etc.), even though
+                 they are passed as a single string.
+
+   - CRITICAL: The Args section must contain ONLY the `query` parameter. Do NOT include
+     any bullet points or parameter-like entries (e.g., "- status:", "- inputs:") in the
+     Args section, even if you are describing what the query string should contain.
+     If you need to describe the structure of data encoded in the query string, do so
+     in prose within the query parameter description, NOT as separate parameter-like entries.
+     LangChain's docstring parser will treat any line matching "- <word>:" as a parameter,
+     which will cause errors if it's not in the function signature.
+
+   - DO NOT mention that the underlying implementation uses another agent or LLM.
+     Describe it as a normal function parameter.
+
+5. **Returns** section:
+
+   - Describe the return value as a structured dictionary that matches the blueprint's
+     `response_format` schema.
+
+   - Explicitly list each top-level field defined in `response_format.properties`, including:
+     - field name
+     - type
+     - meaning / semantics based on the schema and the prompt
+
+   For example, if the schema has:
+
+       status: string; enum ["success", "error"]
+       inputs: object with sub-fields
+       working_dir: string
+       phosphosite_windows: array of objects
+       discoveries: array of objects
+       ...
+
+   then the docstring should say something like:
+
+       Returns:
+           dict: Dictionary matching the <TitleFromSchema> schema with keys:
+               - "status": str. ... (what it represents and allowed values).
+               - "inputs": dict. ... (describe its sub-fields and their roles).
+               - "working_dir": str. ... (what path it represents).
+               - "phosphosite_windows": list[dict]. ... (explain elements).
+               - "discoveries": list[dict]. ... (describe each discovery item).
+               - ... (and so on for all top-level properties).
+
+   - If there are nested objects or arrays (e.g., lists of kinase records, literature notes),
+     describe their structure and purpose at a high level, focusing on what the caller can rely on.
+
+6. **Raises** section (optional but encouraged):
+
+   - If the blueprint clearly defines "error" conditions (e.g., when required tools fail,
+     required data can't be resolved, or "status" is set to "error"), you may document them
+     under:
+
+         Raises:
+             ValueError: If required inputs are malformed or cannot be resolved.
+             RuntimeError: If internal analysis steps fail in a way that prevents
+                 producing a valid result.
+
+   - However, keep this generic; you are inferring behavior from text, not inventing
+     precise exception types.
+
+7. **Notes** or **Examples** (optional):
+
+   - Use a "Notes:" section instead of "Examples" unless the blueprint naturally gives a very clear example.
+   - In "Notes:", summarize especially important behaviors from the prompt, such as:
+     - Early termination conditions (e.g., "If no phosphosite windows are found, the function
+       returns a result where `phosphosite_windows` is an empty list and `status` is 'success',
+       and it skips later analysis steps.");
+     - File-writing side effects (e.g., "This function writes a report file under a
+       `generated_artifacts/<name>_<timestamp>/...` directory and returns its path in
+       the `report_path` field.");
+     - How literature search and scoring steps conceptually influence the contents
+       of specific output fields.
+
+STYLE & CONTENT RULES
+---------------------
+- DO:
+  - Use clear, concise, professional language.
+  - Rephrase the blueprint's instructions into a coherent narrative of what the function does.
+  - Respect all "MUST", "CRITICAL", "early exit", and other strong constraints, summarizing them in the description or Notes.
+  - Clearly differentiate between:
+    - required vs optional output fields;
+    - success vs error scenarios if the schema or prompt distinguish them;
+    - early-exit success modes vs genuine error modes, when specified.
+
+- DO NOT:
+  - Mention "LLM", "agent", "LangGraph", "model", "tool calling", or "prompt" in the docstring.
+  - Mention that the implementation internally calls external search APIs, web tools,
+    or other agents, even if the blueprint lists tools.
+  - Refer to the word "blueprint" or show any of the blueprint text directly.
+    The docstring should look like it was written by a human who understands
+    what the function does, not like a transcription of the YAML.
+
+- You MAY:
+  - Refer generically to "external data sources" or "external services" if the behavior
+    clearly involves web or database lookups, but keep it high-level.
+  - Mention any important outputs that are file paths, IDs, or references to
+    saved reports, as long as that is clearly described in the blueprint.
+
+HOW TO USE THE BLUEPRINT
+------------------------
+You will receive the agent blueprint as plain text after these instructions.
+Assume it is a YAML-like document with keys like `name`, `tools`, `prompt`,
+`response_format`, etc.
+
+From that text you MUST:
+
+1. Identify the agent/function name from the `name` field.
+2. Read the `prompt` field carefully to infer:
+   - the function's domain (e.g., phosphorylation variant analysis, glycobiology, etc.);
+   - what logical inputs the user must conceptually provide;
+   - the high-level sequence of analysis steps, especially any numbered "Method" or "Steps";
+   - early-termination rules and mandatory side effects (e.g., file saving).
+3. Read `response_format` and translate its JSON schema into a clear description of
+   the function's return dictionary, including:
+   - properties,
+   - types,
+   - intended meanings,
+   - special constraints like enums, bounds, or required vs optional fields.
+4. Combine this information into a single coherent Google-style docstring.
+
+OUTPUT FORMAT
+-------------
+You must output **only** a single JSON object with this shape:
+
+    {
+      "docstring": "<the complete Python docstring here>"
+    }
+
+- The value of "docstring" must be a single string containing the full docstring.
+- Do NOT wrap the docstring in backticks or code fences.
+- Do NOT include any additional keys or text outside this JSON object.
+- The docstring itself must NOT mention this JSON wrapper or that it was generated from a blueprint.
+
+After this prompt text, you will see the blueprint. Use it to construct the docstring.
+"""
