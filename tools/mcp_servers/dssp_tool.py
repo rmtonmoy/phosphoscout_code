@@ -9,6 +9,11 @@ from mcp.server.fastmcp import FastMCP
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
+# Path to the mkdssp binary. Override via MKDSSP_PATH env var if the conda-installed
+# mkdssp has a Boost version mismatch (common when libboost is upgraded separately).
+# See README.md "Install DSSP" section for details.
+MKDSSP_PATH = os.environ.get("MKDSSP_PATH", "mkdssp")
+
 mcp = FastMCP("DSSP_Tool")
 
 # Suppress libcifpp / DSSP warnings
@@ -63,7 +68,7 @@ def _get_dssp_for_uniprot(uniprot_id: str, save_path: str = str(PROJECT_ROOT / "
     structure = parser.get_structure(uniprot_id, pdb_file)
     model = list(structure)[0]
 
-    dssp = DSSP(model, pdb_file)
+    dssp = DSSP(model, pdb_file, dssp=MKDSSP_PATH)
     if len(dssp) == 0:
         raise RuntimeError(f"DSSP returned no residues for {uniprot_id}")
 

@@ -49,14 +49,50 @@ cd ../..
 
 ### 3. Install DSSP
 
-DSSP is required for solvent accessibility calculations. Install via conda:
+DSSP (`mkdssp`) is required for solvent accessibility calculations on AlphaFold structures. There are several ways to install it:
+
+**Option A — conda (recommended):**
 ```bash
 conda install -c salilab dssp
 ```
 
-**Note:** The conda `salilab` channel installs the binary as `mkdssp` (not `dssp`). The code in `tools/mcp_servers/dssp_tool.py` already handles this by calling `DSSP(model, pdb_file, dssp="mkdssp")`.
+**Option B — Build from source:**
+```bash
+git clone https://github.com/PDB-REDO/dssp.git
+cd dssp
+cmake -S . -B build -DCMAKE_INSTALL_PREFIX=$CONDA_PREFIX
+cmake --build build
+cmake --install build
+```
+This requires `libcifpp`, `libmcfp`, and Boost (thread, filesystem, program_options, iostreams) as build dependencies. See https://github.com/PDB-REDO/dssp for full instructions.
 
-Or install from source: https://github.com/PDB-REDO/dssp
+**Option C — System package manager (Ubuntu/Debian):**
+```bash
+sudo apt-get install dssp
+```
+
+#### Troubleshooting: Boost version mismatch
+
+A common issue is that `mkdssp` was compiled against a specific Boost version (e.g., `libboost_thread.so.1.73.0`) but a different version is installed in your conda environment. This manifests as:
+```
+mkdssp: error while loading shared libraries: libboost_thread.so.1.73.0: cannot open shared object file
+```
+
+To fix this, set the `MKDSSP_PATH` environment variable to point to a working `mkdssp` binary. For example, if you have a working installation in another conda environment:
+```bash
+export MKDSSP_PATH=/path/to/working/conda/envs/myenv/bin/mkdssp
+```
+
+Or add it to your `.env` file:
+```
+MKDSSP_PATH=/path/to/working/conda/envs/myenv/bin/mkdssp
+```
+
+You can verify your `mkdssp` works by running:
+```bash
+mkdssp --version
+```
+If it prints a version without errors, it is correctly linked.
 
 ### 4. Install uv (MCP Server Runner)
 
@@ -76,6 +112,7 @@ Edit `.env` and fill in:
 - `TAVILY_API_KEY` — Required. Used by the web_search tool.
 - `GMAIL_TOKEN` — Optional. JSON token for Gmail email notifications.
 - `GMAIL_SENDER_EMAIL` — Optional. Sender email address for notifications.
+- `MKDSSP_PATH` — Optional. Path to a working `mkdssp` binary. Defaults to `mkdssp` (found on PATH). Set this if you encounter Boost library version mismatches (see [Install DSSP](#3-install-dssp)).
 
 ### 6. Biomni Data Lake (First-Run Download)
 
