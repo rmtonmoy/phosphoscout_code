@@ -1,0 +1,19 @@
+# Data files (see README for download instructions)
+data/biomni_data/
+data/clinvar/
+data/phosphosite/
+data/kinase_data/41586_2022_5575_MOESM3_ESM.xlsx
+data/cache/
+data/mutations_to_run.txt
+
+# Runtime outputs
+structures/
+generated_artifacts/
+logs/
+
+# Python
+__pycache__/
+*.pyc
+
+# Environment
+.env
