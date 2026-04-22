@@ -27,8 +27,14 @@ class UniProtAPI:
             cache_manager.create_if_not_exists(self.lock, entity)
             self.dicts[entity] = cache_manager.read_whole_json(self.lock, entity)
 
+    def _ensure_cache_entity(self, entity):
+        cache_manager.create_if_not_exists(self.lock, entity)
+        if entity not in self.dicts:
+            self.dicts[entity] = cache_manager.read_whole_json(self.lock, entity)
+
     """Fetch and return the domain sequence for the given UniProt accession number."""
     def get_domain_seq(self, uniprot_id):
+        self._ensure_cache_entity('uniprot_to_domain_seq')
         warnings.warn("Bypassing uniprot: Using curated data from Kannan Lab(TM)")
         return get_domain_seq_from_id(uniprot_id)
 
@@ -95,12 +101,14 @@ class UniProtAPI:
 
     """Fetch and return the domain sequence for the given UniProt accession number."""
     def get_seq_from_uniprot_id(self, uniprot_id):
+        self._ensure_cache_entity('uniprot_to_seq')
         if uniprot_id in self.dicts['uniprot_to_seq'].keys():
             return self.dicts['uniprot_to_seq'][uniprot_id]
 
         seq = cache_manager.read_json(self.lock, 'uniprot_to_seq', uniprot_id)
         if seq != None:
             #print("CACHE HIT!")
+            self.dicts['uniprot_to_seq'][uniprot_id] = seq
             return seq
 
         print("CASHE MISS!")
@@ -207,12 +215,14 @@ class UniProtAPI:
 
     """Fetch and return the domain sequence for the given UniProt accession number."""
     def get_seq_from_uniprot_id(self, uniprot_id):
+        self._ensure_cache_entity('uniprot_to_seq')
         if uniprot_id in self.dicts['uniprot_to_seq'].keys():
             return self.dicts['uniprot_to_seq'][uniprot_id]
 
         seq = cache_manager.read_json(self.lock, 'uniprot_to_seq', uniprot_id)
         if seq != None:
             #print("CACHE HIT!")
+            self.dicts['uniprot_to_seq'][uniprot_id] = seq
             return seq
 
         print("CASHE MISS!")
@@ -300,12 +310,14 @@ class UniProtAPI:
 
     """Fetch the UniProt ID and validate the sequence."""
     def get_uniprot_ids_from_estn(self, enst_id):
+        self._ensure_cache_entity('estn_to_uniprot')
         if len(enst_id) == 1:
             if enst_id[0] in self.dicts['estn_to_uniprot'].keys():
                 return {enst_id[0] : self.dicts['estn_to_uniprot'][enst_id[0]]}
 
             _id = cache_manager.read_json(self.lock, 'estn_to_uniprot', enst_id[0])
             if _id != None :
+                self.dicts['estn_to_uniprot'][enst_id[0]] = _id
                 return {enst_id[0] : _id}
 
         # id_mapping has a result limit of 25. Need to chunk it

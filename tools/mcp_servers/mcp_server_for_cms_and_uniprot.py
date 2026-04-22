@@ -846,8 +846,9 @@ def _get_phosphosite_comment(protein_pos: int, mutation_pos: int, old_aa: str, n
             return f"No evidence of phosphorylation at position {protein_pos} in the EPSD database"
 
 if __name__ == "__main__":
-    # Test resolve_mutation function directly
     '''
+    # Test resolve_mutation function directly
+    
     gene = "ACVR1"
     mutation = "ARG206HIS"
     organism = "9606"
@@ -873,6 +874,6 @@ if __name__ == "__main__":
         print(f"Analysis result: {analysis_result}")
     else:
         print("Failed to resolve mutation")
+    
     '''
-
     mcp.run(transport='stdio')
