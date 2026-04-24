@@ -114,11 +114,7 @@ Edit `.env` and fill in:
 - `GMAIL_SENDER_EMAIL` — Optional. Sender email address for notifications.
 - `MKDSSP_PATH` — Optional. Path to a working `mkdssp` binary. Defaults to `mkdssp` (found on PATH). Set this if you encounter Boost library version mismatches (see [Install DSSP](#3-install-dssp)).
 
-### 6. Biomni Data Lake (First-Run Download)
-
-On the **first run**, the `BiomniTools` MCP server automatically downloads its data lake. This can be **several GB** (including large files like `BindingDB_All_202409.tsv` ~6 GB). This is a one-time download — subsequent runs use cached files. Ensure you have sufficient disk space and a stable internet connection before the first run.
-
-### 7. Phosformer Server
+### 6. Phosformer Server
 
 The phosphorylation tools for S/T kinases require a running Phosformer prediction server at `http://10.2.4.15:5000`. Ensure the server is accessible from your environment, or update the server URL in `tools/mcp_servers/phosphorylation_tools.py`.
 
@@ -182,11 +178,6 @@ Reports are generated in:
 ## Data Files (Not Included in Repository)
 
 The `data/` directory contains several large data files that are **not tracked in git**. Below is a description of each and how to obtain them.
-
-### `data/biomni_data/` (~15 GB) — Auto-Downloaded
-The entire `data/biomni_data/` directory (containing `data_lake/` and `benchmark/` subdirectories) is **automatically downloaded on first run** by the BiomniTools MCP server. No manual action is needed — just ensure you have sufficient disk space (~15 GB) and a stable internet connection. Subsequent runs use the cached files.
-
-**Location:** `data/biomni_data/`
 
 ### `data/clinvar/variant_summary.txt` (~3.2 GB) — NCBI ClinVar
 The full ClinVar variant summary table (tab-separated). Used by the `clinvar_snp_tool.py` to look up variant records by rsID.
@@ -260,7 +251,8 @@ phosphoscout/
 │   └── docstrings/              # Cached generated docstrings
 ├── tools/
 │   ├── mcp_servers/             # MCP tool servers
-│   │   ├── generic_tool_server.py        # Web search, file ops, Gmail
+│   │   ├── generic_tool_server.py        # File ops, code execution, API query
+│   │   ├── literature_tools.py           # Web search (Tavily) + PubMed/Scholar/arXiv/URL/PDF
 │   │   ├── phosphorylation_tools.py      # Kinase specificity prediction
 │   │   ├── mcp_server_for_cms_and_uniprot.py  # UniProt tools
 │   │   ├── dssp_tool.py                  # Solvent accessibility (DSSP)
@@ -271,8 +263,6 @@ phosphoscout/
 │   │   ├── uniprot_utils.py              # UniProt API utilities
 │   │   ├── well_studied_kinase_utils.py  # Curated kinase data
 │   │   └── cache_manager.py              # JSON cache management
-│   ├── biomni_tools/
-│   │   └── run_mcp_server.py    # Literature tools (PubMed, Scholar, arXiv)
 │   └── kinase-library/          # Kinase Library package
 ├── data/
 │   ├── mutations_to_run.txt     # Input mutation list

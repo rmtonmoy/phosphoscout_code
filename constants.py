@@ -10,20 +10,11 @@ CONFIGS_PATH = str(PROJECT_ROOT / "configs")
 GENERIC_TOOL_SERVER_PATH = str(PROJECT_ROOT / "tools" / "mcp_servers" / "generic_tool_server.py")
 PHOSPHORYLATION_TOOLS_SERVER_PATH = str(PROJECT_ROOT / "tools" / "mcp_servers" / "phosphorylation_tools.py")
 UNIPROT_TOOLS_SERVER_PATH = str(PROJECT_ROOT / "tools" / "mcp_servers" / "mcp_server_for_cms_and_uniprot.py")
-BIOMNI_TOOLS_SERVER_PATH = str(PROJECT_ROOT / "tools" / "biomni_tools" / "run_mcp_server.py")
+LITERATURE_TOOLS_SERVER_PATH = str(PROJECT_ROOT / "tools" / "mcp_servers" / "literature_tools.py")
 CLINVAR_SNP_TOOL_PATH = str(PROJECT_ROOT / "tools" / "mcp_servers" / "clinvar_snp_tool.py")
 DSSP_TOOL_PATH = str(PROJECT_ROOT / "tools" / "mcp_servers" / "dssp_tool.py")
 GENE_EXPRESSION_TOOLS_PATH = str(PROJECT_ROOT / "tools" / "mcp_servers" / "gene_expression_tools.py")
 REPORT_GENERATION_TOOLS_PATH = str(PROJECT_ROOT / "tools" / "mcp_servers" / "report_generation_tools.py")
-
-# To make biomni tools work
-import builtins
-import sys
-_real_print = builtins.print
-def _print_to_stderr(*args, **kwargs):
-    kwargs.setdefault("file", sys.stderr)
-    return _real_print(*args, **kwargs)
-builtins.print = _print_to_stderr
 
 MCP_CLIENT = MultiServerMCPClient(
         {
@@ -32,9 +23,9 @@ MCP_CLIENT = MultiServerMCPClient(
                 "args": ["run", DSSP_TOOL_PATH],
                 "transport": "stdio",
             },
-            "BiomniTools": {
+            "Literature_Tools": {
                 "command": "uv",
-                "args": ["run", BIOMNI_TOOLS_SERVER_PATH],
+                "args": ["run", LITERATURE_TOOLS_SERVER_PATH],
                 "transport": "stdio",
             },
             "generic_tool_server": {
