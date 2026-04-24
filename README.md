@@ -191,11 +191,15 @@ gunzip data/clinvar/variant_summary.txt.gz
 ```
 **Location:** `data/clinvar/variant_summary.txt`
 
+---
+
 ### `data/phosphosite/Homo_sapiens.txt` (~221 MB) — PhosphoSitePlus (EPSD)
 Experimentally validated phosphorylation sites for human proteins. Tab-separated file with columns: EPSD ID, UniProt ID, AA, Position, Source, Reference. Used by `mcp_server_for_cms_and_uniprot.py` to retrieve known phosphosites for a given UniProt ID.
 
 **Download from:** https://epsd.biocuckoo.cn/ (EPSD database — Eukaryotic Phosphorylation Site Database)
 **Location:** `data/phosphosite/Homo_sapiens.txt`
+
+---
 
 ### `data/kinase_data/41586_2022_5575_MOESM3_ESM.xlsx` (~129 KB) — Cantley Lab Kinase Atlas
 Supplementary Table 3 from: Johnson, J. L., et al. (2023). "An atlas of substrate specificities for the human serine/threonine kinome." *Nature*, 613(7945), 759-766. Contains curated serine/threonine kinase data used for building the well-studied kinase list.
@@ -203,12 +207,16 @@ Supplementary Table 3 from: Johnson, J. L., et al. (2023). "An atlas of substrat
 **Download from:** Supplementary materials of https://doi.org/10.1038/s41586-022-05575-3
 **Location:** `data/kinase_data/41586_2022_5575_MOESM3_ESM.xlsx`
 
+---
+
 ### `data/kinase_data/pkfold_hs_curated.fa` (~320 KB) — Curated Kinase Domain Sequences (INCLUDED IN REPO)
 A FASTA file of curated human kinase catalytic domain sequences, indexed by UniProt ID. Used by `phosphorylation_tools.py` and `well_studied_kinase_utils.py` for kinase domain sequence lookups. This file is **included in the repository** as it is a curated dataset from the Kannan Lab and is not available for download elsewhere.
 
 **Location:** `data/kinase_data/pkfold_hs_curated.fa`
 
-### `data/cache/` (~14 MB) — Auto-Generated Runtime Caches
+---
+
+### `data/cache/` — Auto-Generated Runtime Caches
 These JSON cache files are **automatically generated at runtime** to avoid repeated API calls. They do not need to be provided manually — they will be created on first run.
 
 - `cache/uniprot/estn_to_uniprot.json` — Ensembl transcript ID to UniProt accession mapping
@@ -222,10 +230,14 @@ These JSON cache files are **automatically generated at runtime** to avoid repea
 
 **Location:** `data/cache/`
 
+---
+
 ### `data/mutations_to_run.txt` — User Input File
 JSON array of mutation objects to analyze. This is your input file — create it with the mutations you want to process. See the [Input Format](#input-format) section above for the expected schema. A sample file with common cancer mutations is not included in the repository.
 
 **Location:** `data/mutations_to_run.txt`
+
+---
 
 ## Project Structure
 
