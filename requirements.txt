@@ -3,6 +3,7 @@ langchain>=0.3.0
 langchain-core>=0.3.0
 langchain-openai>=0.3.0
 langchain-anthropic>=1.0.0
+langchain-together>=0.2.0
 langgraph>=0.2.0
 langchain-mcp-adapters>=0.1.0
 langchain-tavily>=0.1.0
@@ -20,11 +21,15 @@ biopython>=1.80
 PyPDF2>=3.0.0
 
 # Bioinformatics
-biomni>=0.0.7
 cellxgene-census>=1.17.0
 tiledbsoma>=2.1.0
 pydssp>=0.9.0
 kinase_library
+
+# Literature search (used by tools/mcp_servers/literature_tools.py)
+arxiv>=2.0.0
+scholarly>=1.7.0
+pymed>=0.8.9
 
 # Web and API
 requests>=2.28.0

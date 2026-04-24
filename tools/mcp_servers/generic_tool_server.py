@@ -1,8 +1,7 @@
 """
-MCP server with web search, file operations, and code execution tools.
+MCP server with file operations and code execution tools.
 
 Available Tools:
-- web_search: Search the public web for up-to-date information and sources
 - code_executor: Execute Python code with timeout and security restrictions
 - file_writer: Write content to a file with optional directory creation
 - ls: List files and directories in a specified path
@@ -14,7 +13,6 @@ Available Tools:
 import os
 from pathlib import Path
 from mcp.server.fastmcp import FastMCP
-from langchain_tavily import TavilySearch
 import dotenv
 from typing import Union, Optional
 import io
@@ -30,61 +28,6 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 dotenv.load_dotenv(str(PROJECT_ROOT / '.env'))
 mcp = FastMCP("GenericToolServer")
-
-@mcp.tool()
-def web_search(query: Union[str, dict]) -> str:
-    """Search the public web for up-to-date information and sources
-
-    Args:
-        query: A concise query string or a dictionary with a key-value pair where the key is the query
-
-    Returns:
-        Summarized results with citations
-    """
-    # Extract query string from input
-    if isinstance(query, dict):
-        if not query:
-            raise ValueError("Dictionary input cannot be empty")
-        # Use the first key as the query
-        search_query = list(query.keys())[0]
-    else:
-        search_query = query
-
-    tavily_search = TavilySearch(
-        max_results=5,
-        topic="general",
-    )
-
-    # Get the search results
-    results = tavily_search.invoke(search_query)
-
-    # Handle different response formats
-    if isinstance(results, str):
-        return results
-    elif isinstance(results, dict):
-        # Format the results as a readable string
-        formatted_results = f"Search results for: {search_query}\n\n"
-
-        if "results" in results:
-            for i, result in enumerate(results["results"], 1):
-                formatted_results += f"{i}. "
-                if "title" in result:
-                    formatted_results += f"{result['title']}\n"
-                if "content" in result:
-                    formatted_results += f"   {result['content']}\n"
-                if "url" in result:
-                    formatted_results += f"   Source: {result['url']}\n"
-                formatted_results += "\n"
-        else:
-            # If the structure is different, convert the dict to string
-            formatted_results += str(results)
-
-        return formatted_results
-    else:
-        # Fallback for any other type
-        return str(results)
-
-
 
 
 @mcp.tool()
