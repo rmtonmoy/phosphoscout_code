@@ -179,6 +179,18 @@ The mutations input file (`data/mutations_to_run.txt`) is a JSON array of mutati
 }
 ```
 
+A sample `data/mutations_to_run.txt` is included in the repository with a single TP53 C176S entry:
+```json
+[
+  {
+    "gene_name": "TP53",
+    "mutation_aa": "p.C176S",
+    "aa_mut_start": 176,
+    "aa_mut_stop": 176
+  }
+]
+```
+
 ### Output
 
 Reports are generated in:
@@ -243,7 +255,7 @@ These JSON cache files are **automatically generated at runtime** to avoid repea
 ---
 
 ### `data/mutations_to_run.txt` — User Input File
-JSON array of mutation objects to analyze. This is your input file — create it with the mutations you want to process. See the [Input Format](#input-format) section above for the expected schema. A sample file with common cancer mutations is not included in the repository.
+JSON array of mutation objects to analyze. A sample file with a TP53 p.C176S entry is included in the repository. Replace or extend it with the mutations you want to process. See the [Input Format](#input-format) section above for the expected schema.
 
 **Location:** `data/mutations_to_run.txt`
 
