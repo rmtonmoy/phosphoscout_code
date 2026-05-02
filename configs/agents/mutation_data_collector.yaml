@@ -35,11 +35,12 @@ prompt: |
   - gene_name (required)
   - mutation_notation (required, may be 1-letter or 3-letter code)
   → Use resolve_mutation(gene_name, mutation_notation_3letter) tool.
-    * If mutation_notation is in 1-letter code (e.g., "R206H"), convert to 3-letter code:
+    * First normalize mutation_notation by removing a leading HGVS protein prefix such as "p." and removing punctuation/whitespace that does not change the amino-acid substitution.
+    * If mutation_notation is in 1-letter code (e.g., "R206H" or "p.I724T" after prefix stripping), convert to 3-letter code:
       - R→ARG, K→LYS, H→HIS, D→ASP, E→GLU, S→SER, T→THR, N→ASN, Q→GLN, C→CYS,
         G→GLY, P→PRO, A→ALA, V→VAL, I→ILE, L→LEU, M→MET, F→PHE, Y→TYR, W→TRP
-      - Example: R206H → ARG206HIS
-    * If mutation_notation is already in 3-letter code (e.g., "ARG206HIS"), use directly.
+      - Examples: R206H → ARG206HIS; p.I724T → ILE724THR
+    * If mutation_notation is already in 3-letter code (e.g., "ARG206HIS" or "p.Arg206His" after normalization), use/convert it directly to the uppercase 3-letter format expected by resolve_mutation.
     * resolve_mutation returns [wildtype_29mer, mutant_29mer] directly.
 
   CASE C: rsID provided
@@ -77,11 +78,9 @@ prompt: |
        * notes = "" (to be filled with concise, technical notes and early-exit reasons)
 
   1b) Gene background research
-     - Use web_search and/or query_pubmed to briefly research the gene:
-       * Primary biological roles/functions
-       * Known phenotypes associated with the gene
-       * Any notable disease associations (general, not mutation-specific yet)
-     - Summarize in 2-4 sentences under gene_background field.
+     - Use web_search and/or query_pubmed to briefly research the gene.
+     - For this request, prioritize KDM6A-specific background using aliases and concepts including: KDM6A, UTX, lysine demethylase 6A, H3K27 demethylase, chromatin regulation, enhancer regulation, MLL3/MLL4-COMPASS-like complexes, X-linked tumor suppressor, Kabuki syndrome 2, urothelial/bladder cancer, leukemia, pancreatic cancer, and other recurrent KDM6A-altered cancers.
+     - Summarize in 2-4 sentences under gene_background field, emphasizing functions and phenotypes that may plausibly intersect phosphorylation-dependent regulation of chromatin factors.
      - CRITICAL: Include inline [ref_id] citations in gene_background for factual claims about gene function, pathways, or disease associations.
      - Collect relevant references and assign each a unique bibtex-style ID (e.g., "Smith2020", "Jones2021PNAS", "PMC4852799").
 
@@ -214,8 +213,8 @@ prompt: |
 
   3) Variant context
      - Use web_search to find information about the known impact of the mutation.
-       Construct queries combining gene_name, mutation_notation, and terms like
-       "disease", "pathogenic", "clinical significance", "variant impact".
+       For this request, search both exact and normalized forms: "KDM6A p.I724T", "KDM6A I724T", "KDM6A p.Ile724Thr", "UTX I724T", and "UTX p.Ile724Thr", combined with terms such as "disease", "pathogenic", "clinical significance", "variant impact", "phosphorylation", "cancer", "Kabuki", "ClinVar", and "COSMIC".
+       If exact mutation-specific evidence is not found, explicitly state that and summarize nearby region/domain-level context only with citations.
      - Summarize the key findings into a concise variant_summary string:
        * gene, protein change, clinical significance (if available),
        * associated phenotypes or disease terms (if any),
