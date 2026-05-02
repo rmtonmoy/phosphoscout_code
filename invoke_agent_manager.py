@@ -7,6 +7,8 @@ Supports multiprocessing for parallel mutation processing.
 import asyncio
 import json
 import os
+import shutil
+import subprocess
 from pathlib import Path
 from dotenv import load_dotenv
 from langchain_core.messages import HumanMessage
@@ -166,6 +168,51 @@ async def invoke_mutation(input_data, mutation_index, total_mutations):
         return False
 
 
+WEBSITE_DIR = Path("/home/phosphoscout/website")
+WEBSITE_REPORTS_DIR = WEBSITE_DIR / "docs" / "reports"
+PHOSPHOSCOUT_PYTHON = "/home/phosphoscout/miniconda3/envs/phosphoscout/bin/python"
+
+
+def publish_reports_to_website(project_root: Path) -> None:
+    """Copy generated HTML reports to the website, rebuild, commit, and push."""
+    html_reports_dir = project_root / "generated_artifacts" / "reports" / "html_reports"
+    if not html_reports_dir.is_dir():
+        print("No html_reports directory found — skipping website publish.")
+        return
+
+    WEBSITE_REPORTS_DIR.mkdir(parents=True, exist_ok=True)
+    copied = []
+    for html_file in html_reports_dir.glob("*.html"):
+        dest = WEBSITE_REPORTS_DIR / html_file.name
+        shutil.copy2(html_file, dest)
+        copied.append(html_file.name)
+
+    if not copied:
+        print("No HTML reports to publish.")
+        return
+
+    print(f"Publishing {len(copied)} report(s) to website: {copied}")
+
+    subprocess.run(
+        [PHOSPHOSCOUT_PYTHON, str(WEBSITE_DIR / "build.py")],
+        cwd=str(WEBSITE_DIR),
+        check=True,
+        timeout=120,
+    )
+
+    subprocess.run(["git", "add", "-A"], cwd=str(WEBSITE_DIR), check=True, timeout=30)
+    result = subprocess.run(
+        ["git", "commit", "-m", f"Add report(s): {', '.join(copied)}"],
+        cwd=str(WEBSITE_DIR),
+        timeout=30,
+    )
+    if result.returncode == 0:
+        subprocess.run(["git", "push"], cwd=str(WEBSITE_DIR), check=True, timeout=60)
+        print(f"Website updated and pushed.")
+    else:
+        print("Nothing new to commit to website (already published).")
+
+
 def invoke_all_mutations_parallel(max_workers=None):
     """Load mutations from file and process them in parallel using multiprocessing."""
 
@@ -218,6 +265,9 @@ def invoke_all_mutations_parallel(max_workers=None):
     print(f"Failed: {failed}")
     print("=" * 80)
 
+    if successful > 0:
+        publish_reports_to_website(PROJECT_ROOT)
+
 
 async def invoke_all_mutations():
     """Load mutations from file and process each one sequentially."""
@@ -248,6 +298,9 @@ async def invoke_all_mutations():
     print(f"Successful: {successful}")
     print(f"Failed: {failed}")
     print("=" * 80)
+
+    if successful > 0:
+        publish_reports_to_website(PROJECT_ROOT)
 
 
 if __name__ == "__main__":
