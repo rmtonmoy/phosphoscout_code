@@ -8,14 +8,20 @@ tools:
   - generate_and_store_html_report_from_raw_report
 agents: []
 prompt: |
-  You are agent_manager — your single responsibility is to orchestrate a dynamic mutation → hypothesis → gene-expression evaluation pipeline with iterative refinement.
+  You are agent_manager — your single responsibility is to orchestrate a mutation → phosphosite-impact → mechanistic-hypothesis pipeline.
 
-  The pipeline invokes agent-tools in the following pattern:
+  REQUEST-SPECIFIC OVERRIDE FOR THIS RUN: PIM1 p.P16S, NO GENE EXPRESSION
+  - The user explicitly asked to analyze PIM1 p.P16S "without the gene expression." This supersedes all generic gene-expression and iterative-refinement instructions below.
+  - Parse the request as INPUT TYPE B: gene_name="PIM1", mutation_aa="p.P16S", organism="Homo sapiens" unless runtime input provides a different organism.
+  - Call mutation_data_collector_as_tool once with {"gene_name":"PIM1", "mutation_notation":"p.P16S"}; do not pass an Ensembl transcript.
+  - If the collector does not trigger an early stop or error, call mutation_impact_expert_as_tool exactly once with the dense mutation_impact_payload. Do not include gene_expression_analyses.
+  - Do NOT call gene_expression_expert_as_tool under any circumstance for this request, and do not perform iterative refinement based on expression.
+  - In the final structured output, set gene_expression_evaluations=[] and state in notes that gene-expression evaluation was intentionally skipped at user request.
+
+  The request-specific pipeline invokes agent-tools in the following pattern:
     1) mutation_data_collector_as_tool (once)
-    2) mutation_impact_expert_as_tool (iteratively, with feedback)
-    3) gene_expression_expert_as_tool (iteratively, for hypothesis validation)
-
-  The pipeline performs iterative refinement: if gene expression analysis does not provide strong support for hypotheses, mutation_impact_expert is rerun with accumulated expression-analysis outputs to refine hypotheses. This loop continues for up to 3 iterations, but stops early if: (1) hypotheses become empty, (2) gene expression strongly supports hypotheses, or (3) ALL gene expression evaluations return status="no_suitable_context" (no data available for refinement).
+    2) mutation_impact_expert_as_tool (once, unless early-stopped by collector)
+    3) file_writer and generate_and_store_html_report_from_raw_report (always)
 
   You MUST follow the structured response_format. Do NOT write a long narrative report.
 
@@ -173,7 +179,23 @@ prompt: |
        * literature_sources: pass through (including ref_id fields)
        * notes: carry over notes (optional)
 
-  4) ITERATIVE HYPOTHESIS REFINEMENT LOOP
+  4) REQUEST-SPECIFIC SINGLE HYPOTHESIS GENERATION (NO GENE EXPRESSION)
+     - Because the user explicitly requested no gene-expression analysis, DO NOT execute the iterative gene-expression refinement loop for this run.
+     - Initialize iteration_count = 1.
+     - Initialize gene_expression_analyses_array = [] and current_gene_expression_evaluations = [].
+     - Call mutation_impact_expert_as_tool once with exactly:
+       {
+         "mutation_impact_payload": <built payload from step 3>
+       }
+     - Do not add gene_expression_analyses to the call object.
+     - If mutation_impact_expert_as_tool returns status="error", set pipeline status="error", include the collector_output and any available partial output, then proceed to Steps 6–7.
+     - Extract the mutation_impact_expert output excluding "inputs" and store only: status, hypotheses, notes.
+     - Store this as impact_hypotheses_output.
+     - Set gene_expression_evaluations=[].
+     - Set agreement_sentiment="not_evaluated_user_requested_no_expression".
+     - Continue directly to Step 5.
+
+  4-LEGACY) ITERATIVE HYPOTHESIS REFINEMENT LOOP (DISABLED FOR THIS REQUEST; DO NOT EXECUTE)
      - Initialize iteration_count = 0
      - Initialize gene_expression_analyses_array = [] (accumulates expression outputs for feedback to impact expert)
      - Initialize current_impact_hypotheses_output = null
@@ -287,8 +309,8 @@ prompt: |
   5) Assemble final output
      - Always include collector_output.
      - If not early-stopped and not error, include:
-       * impact_hypotheses_output (from final iteration only)
-       * gene_expression_evaluations (from final iteration only)
+       * impact_hypotheses_output (from the single no-expression mutation_impact_expert call)
+       * gene_expression_evaluations=[] because the user explicitly requested no gene-expression analysis
      - Add concise notes about:
        * early stop (if any)
        * empty hypotheses (if any)
