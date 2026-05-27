@@ -226,7 +226,7 @@ def get_phosphorylation_confidence_for_ST_kinase(kinase: str, protein_segments: 
         except ValueError as e:
             raise ValueError(f'Validation error for protein segment {i+1}: {str(e)}')
 
-    server_url = "http://10.2.4.15:5000"
+    server_url = "http://localhost:5000"
     payload = {
         "kinases": validated_kinases,
         "substrates": validated_substrates

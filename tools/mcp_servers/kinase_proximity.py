@@ -251,12 +251,32 @@ def get_hpa_subcellular_locations(gene_name: str, species: str = "9606") -> Set[
 
 def check_proximity(kinase_name, substrate_name, species="9606"):
     """
-    Determine if kinase and substrate are in the same pathway or subcellular compartment.
+    Determine if a kinase and substrate are likely to physically
+    encounter each other in the cell, based on shared subcellular
+    compartment (UniProt + HPA) or shared Reactome pathway.
+
     Returns (proximity_boolean, evidence_string).
 
-    - kinase_name: gene name of the kinase (e.g. 'AKT1')
+    - kinase_name:    gene name of the kinase    (e.g. 'AKT1')
     - substrate_name: gene name of the substrate (e.g. 'GSK3B')
-    - species: taxonomy ID or name (default 9606 for human)
+    - species:        taxonomy ID or name (default 9606 for human)
+
+    Design rationale
+    ----------------
+    This function is intended as a pre-filter applied BEFORE kinase-
+    specificity (motif / sequence) scoring. The biological premise is
+    that a kinase cannot phosphorylate a substrate it never co-localizes
+    with: physical proximity in a compartment, or co-membership in a
+    pathway, is a necessary condition for the reaction to occur in vivo.
+
+    Running specificity scoring over the full kinome without this
+    constraint returns biologically implausible top hits -- kinases that
+    score well on the substrate's motif but are never present in the
+    same compartment or pathway as the substrate, and therefore cannot
+    realistically phosphorylate it. Restricting candidate kinases to
+    those sharing at least one compartment or pathway with the substrate
+    removes these candidates before scoring, so the downstream score
+    distribution is concentrated on biologically reachable kinases.
 
     Logic:
       1) Fetch subcellular locations from HPA using gene symbols (human only).
