@@ -51,10 +51,11 @@ cd ../..
 
 DSSP (`mkdssp`) is required for solvent accessibility calculations on AlphaFold structures. There are several ways to install it:
 
-**Option A — conda (recommended):**
+**Option A — System package manager (recommended, Ubuntu/Debian):**
 ```bash
-conda install -c salilab dssp
+sudo apt-get install dssp
 ```
+This installs a modern version (4.2.2) that is statically linked and has no Boost dependency issues, making it the most reliable option.
 
 **Option B — Build from source:**
 ```bash
@@ -64,28 +65,37 @@ cmake -S . -B build -DCMAKE_INSTALL_PREFIX=$CONDA_PREFIX
 cmake --build build
 cmake --install build
 ```
-This requires `libcifpp`, `libmcfp`, and Boost (thread, filesystem, program_options, iostreams) as build dependencies. See https://github.com/PDB-REDO/dssp for full instructions.
+This requires `libcifpp`, `libmcfp`, and Boost (thread, filesystem, program_options, iostreams) as build dependencies. See https://github.com/PDB-REDO/dssp for full instructions. Use this as a fallback if `apt` is not available or you need a specific version.
 
-**Option C — System package manager (Ubuntu/Debian):**
+**Option C — conda (not recommended):**
 ```bash
-sudo apt-get install dssp
+conda install -c salilab dssp
 ```
-
-#### Troubleshooting: Boost version mismatch
-
-A common issue is that `mkdssp` was compiled against a specific Boost version (e.g., `libboost_thread.so.1.73.0`) but a different version is installed in your conda environment. This manifests as:
+**Warning:** The conda package from the `salilab` channel installs an outdated version (3.0.0) built against Boost 1.73.0. In modern conda environments the installed Boost version is typically newer, which causes runtime errors like:
 ```
 mkdssp: error while loading shared libraries: libboost_thread.so.1.73.0: cannot open shared object file
 ```
+Prefer Option A or B to avoid this issue.
 
-To fix this, set the `MKDSSP_PATH` environment variable to point to a working `mkdssp` binary. For example, if you have a working installation in another conda environment:
+#### Fixing a broken conda DSSP installation
+
+If you previously installed `dssp` via conda and are hitting the Boost error above, remove the broken package and clear the shell's cached path to the old binary:
 ```bash
-export MKDSSP_PATH=/path/to/working/conda/envs/myenv/bin/mkdssp
+conda remove dssp
+hash -d mkdssp
+```
+Then reinstall using Option A or B.
+
+#### Troubleshooting: MKDSSP_PATH override
+
+If none of the above options work in your environment, you can point PhosphoScout at any working `mkdssp` binary by setting the `MKDSSP_PATH` environment variable:
+```bash
+export MKDSSP_PATH=/path/to/working/mkdssp
 ```
 
 Or add it to your `.env` file:
 ```
-MKDSSP_PATH=/path/to/working/conda/envs/myenv/bin/mkdssp
+MKDSSP_PATH=/path/to/working/mkdssp
 ```
 
 You can verify your `mkdssp` works by running:
