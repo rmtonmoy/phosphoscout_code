@@ -149,20 +149,18 @@ def query_scholar(query: str) -> str:
     Returns:
         The first search result formatted or an error message.
     """
-    from scholarly import ProxyGenerator, scholarly
+    from scholarly import scholarly
 
-    pg = ProxyGenerator()
-    pg.FreeProxies()
-    scholarly.use_proxy(pg)
     try:
         search_query = scholarly.search_pubs(query)
         result = next(search_query, None)
         if result:
+            bib = result["bib"]
             return (
-                f"Title: {result['bib']['title']}\n"
-                f"Year: {result['bib']['pub_year']}\n"
-                f"Venue: {result['bib']['venue']}\n"
-                f"Abstract: {result['bib']['abstract']}"
+                f"Title: {bib['title']}\n"
+                f"Year: {bib.get('pub_year', 'N/A')}\n"
+                f"Venue: {bib.get('venue', 'N/A')}\n"
+                f"Abstract: {bib.get('abstract', 'N/A')}"
             )
         return "No results found on Google Scholar."
     except Exception as e:
