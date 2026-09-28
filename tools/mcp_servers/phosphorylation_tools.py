@@ -12,6 +12,7 @@ mcp = FastMCP("Phosphorylation_Tools")
 
 import os
 import sys
+import time
 sys.path.append(str(PROJECT_ROOT / 'tools' / 'kinase-library' / 'src'))
 import kinase_library as kl
 import requests
@@ -149,10 +150,10 @@ class PhosformerRequest(BaseModel):
     def validate_protein_segment(cls, v: str) -> str:
         if len(v) != 15:
             raise ValueError('Protein segment must be exactly 15 characters long')
-        middle_char = v[7]  # 0-indexed, so 7 is the middle position
+        middle_char = v[7].upper()  # 0-indexed, so 7 is the middle position
         if middle_char not in ['S', 'T']:
             raise ValueError('Middle character of protein segment must be S or T')
-        return v
+        return v.upper()
 class KlRequest(BaseModel):
     kinase: str
     protein_segment: str
@@ -180,6 +181,64 @@ class KlRequest(BaseModel):
             protein_segment_list[7] = 'y'
 
         return ''.join(protein_segment_list)
+
+ST_PREDICT_URL = "https://esbg.bmb.uga.edu/phosphoscout-api/predict"
+ST_PREDICT_CHUNK_SIZE = 20
+
+
+def _post_st_predictions(kinases: List[str], substrates: List[str]) -> List[float]:
+    """Score kinase/substrate pairs, retrying when the API rate-limits the request."""
+    if len(kinases) != len(substrates):
+        raise ValueError('Number of kinases must match number of substrates')
+    if not kinases:
+        return []
+
+    delay = 2.0
+    max_attempts = 8
+    for attempt in range(max_attempts):
+        response = requests.post(
+            ST_PREDICT_URL,
+            json={"kinases": kinases, "substrates": substrates},
+            headers={'Content-Type': 'application/json'},
+            timeout=180,
+        )
+        if response.status_code == 200:
+            probabilities = response.json().get('probabilities')
+            if not isinstance(probabilities, list) or len(probabilities) != len(kinases):
+                raise RuntimeError(f'Unexpected PhosST response: {response.text[:500]}')
+            return [float(probability) for probability in probabilities]
+
+        body = response.text
+        rate_limited = response.status_code == 429 or 'rate limit' in body.lower()
+        retryable = rate_limited or response.status_code in (502, 503, 504)
+        if retryable and attempt < max_attempts - 1:
+            retry_after = response.headers.get('Retry-After')
+            try:
+                sleep_s = float(retry_after) if retry_after else delay
+            except ValueError:
+                sleep_s = delay
+            print(
+                f"PhosST request failed ({response.status_code}); retrying in {sleep_s:.1f}s",
+                file=sys.stderr,
+            )
+            time.sleep(sleep_s)
+            delay = min(delay * 2, 30.0)
+            continue
+        raise RuntimeError(f'PhosST prediction failed ({response.status_code}): {body[:500]}')
+
+    raise RuntimeError('PhosST prediction failed after retries')
+
+
+def _score_st_domains(domain_seqs: List[str], protein_segment: str) -> List[float]:
+    """Score one protein segment against many kinase domains in chunked API calls."""
+    protein_segment = protein_segment.upper()
+    scores: List[float] = []
+    for start in range(0, len(domain_seqs), ST_PREDICT_CHUNK_SIZE):
+        batch = domain_seqs[start:start + ST_PREDICT_CHUNK_SIZE]
+        scores.extend(_post_st_predictions(batch, [protein_segment] * len(batch)))
+        if start + ST_PREDICT_CHUNK_SIZE < len(domain_seqs):
+            time.sleep(1.0)
+    return scores
 
 @mcp.tool()
 def get_phosphorylation_confidence_for_ST_kinase(kinase: str, protein_segments: List[str]) -> List[float]:
@@ -226,21 +285,7 @@ def get_phosphorylation_confidence_for_ST_kinase(kinase: str, protein_segments: 
         except ValueError as e:
             raise ValueError(f'Validation error for protein segment {i+1}: {str(e)}')
 
-    server_url = "http://localhost:5000"
-    payload = {
-        "kinases": validated_kinases,
-        "substrates": validated_substrates
-    }
-    response = requests.post(
-        f"{server_url}/predict",
-        json=payload,
-        headers={'Content-Type': 'application/json'}
-    )
-
-    if response.status_code == 200:
-        return response.json()['probabilities']
-    else:
-        return f"Error: {response.json()}"
+    return _post_st_predictions(validated_kinases, validated_substrates)
 
 @mcp.tool()
 def get_phosphorylation_confidence_for_Y_kinase(kinase: str, protein_segments: List[str]) -> List[float]:
@@ -380,15 +425,20 @@ def get_predicted_change_in_substrate_specifity_for_ST_kinase(wildtype_protein_s
     valid_wildtype = wildtype_protein_segment[7].upper() in ['S', 'T']
     valid_mutant = mutant_protein_segment[7].upper() in ['S', 'T']
 
-    data: Dict[str, Dict[str, float]] = {}
+    jobs: List[tuple] = []
     for kin in get_ST_kinase_list():
         for dom_seq in _get_domain_seq_from_id(kin):
-            wildtype_confidence = get_phosphorylation_confidence_for_ST_kinase(dom_seq, [wildtype_protein_segment])[0] if valid_wildtype else 0.0
-            mutant_confidence = get_phosphorylation_confidence_for_ST_kinase(dom_seq, [mutant_protein_segment])[0] if valid_mutant else 0.0
-            change = mutant_confidence - wildtype_confidence
+            jobs.append((kin, dom_seq))
+    domain_seqs = [dom_seq for _, dom_seq in jobs]
+    wildtype_scores = _score_st_domains(domain_seqs, wildtype_protein_segment) if valid_wildtype else [0.0] * len(jobs)
+    mutant_scores = _score_st_domains(domain_seqs, mutant_protein_segment) if valid_mutant else [0.0] * len(jobs)
 
-            if kin not in data or abs(change) > abs(data[kin]["change"]):
-                data[kin] = {"change": change, "wildtype_value": wildtype_confidence, "mutant_value": mutant_confidence}
+    data: Dict[str, Dict[str, float]] = {}
+    for (kin, _), wildtype_confidence, mutant_confidence in zip(jobs, wildtype_scores, mutant_scores):
+        change = float(mutant_confidence) - float(wildtype_confidence)
+
+        if kin not in data or abs(change) > abs(data[kin]["change"]):
+            data[kin] = {"change": change, "wildtype_value": wildtype_confidence, "mutant_value": mutant_confidence}
 
     # Convert UniProt IDs to gene names; fallback to UniProt ID on failure
     result: List[Dict[str, float]] = []
@@ -468,14 +518,19 @@ def get_substantial_change_in_specificity_with_proximity_check(gene_name: str, w
 
         valid_wildtype = wildtype_protein_segment[7].upper() in ['S', 'T']
         valid_mutant = mutant_protein_segment[7].upper() in ['S', 'T']
-        data: Dict[str, Dict[str, float]] = {}
+        jobs: List[tuple] = []
         for kin in proximal_kinase:
             for dom_seq in _get_domain_seq_from_id(kin):
-                wildtype_conf = get_phosphorylation_confidence_for_ST_kinase(dom_seq, [wildtype_protein_segment])[0] if valid_wildtype else 0.0
-                mutant_conf = get_phosphorylation_confidence_for_ST_kinase(dom_seq, [mutant_protein_segment])[0] if valid_mutant else 0.0
-                change = mutant_conf - wildtype_conf
-                if kin not in data or abs(change) > abs(data[kin]["change"]):
-                    data[kin] = {"change": change, "wildtype_value": wildtype_conf, "mutant_value": mutant_conf}
+                jobs.append((kin, dom_seq))
+        domain_seqs = [dom_seq for _, dom_seq in jobs]
+        wildtype_scores = _score_st_domains(domain_seqs, wildtype_protein_segment) if valid_wildtype else [0.0] * len(jobs)
+        mutant_scores = _score_st_domains(domain_seqs, mutant_protein_segment) if valid_mutant else [0.0] * len(jobs)
+
+        data: Dict[str, Dict[str, float]] = {}
+        for (kin, _), wildtype_conf, mutant_conf in zip(jobs, wildtype_scores, mutant_scores):
+            change = float(mutant_conf) - float(wildtype_conf)
+            if kin not in data or abs(change) > abs(data[kin]["change"]):
+                data[kin] = {"change": change, "wildtype_value": wildtype_conf, "mutant_value": mutant_conf}
 
         # Convert UniProt IDs to gene names and apply specificity-change filter for ST protein segments (probability scale)
         result: List[Dict[str, float]] = []

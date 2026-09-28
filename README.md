@@ -116,7 +116,9 @@ Edit `.env` and fill in:
 
 ### 6. Phosformer Server
 
-The phosphorylation tools for S/T kinases require a running Phosformer prediction server at `http://10.2.4.15:5000`. Ensure the server is accessible from your environment, or update the server URL in `tools/mcp_servers/phosphorylation_tools.py`.
+S/T kinase scoring calls a Phosformer prediction service hosted by the ESBG lab at `https://esbg.bmb.uga.edu/phosphoscout-api`. It should work as is.
+
+To host your own Phosformer model, serve an endpoint that matches the request in `tools/mcp_servers/phosphorylation_tools.py` (`_post_st_predictions`): POST `/predict` with JSON `{"kinases": [...], "substrates": [...]}` (equal-length lists of kinase domain sequences and 15-residue substrates centered on S or T) and return `{"probabilities": [...]}` with one float per pair. Then set `ST_PREDICT_URL` in that file to your server.
 
 ## Usage
 
